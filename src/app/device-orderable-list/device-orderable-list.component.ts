@@ -12,7 +12,7 @@ import {fabric} from "fabric";
 import {IDragObjectOptions} from "./components/IDragObjectOptions";
 import {DragObject} from "./components/dragObject";
 import {ICanvasOptions} from "fabric/fabric-impl";
-import {Device} from "./model/Device";
+import {DnaDevice} from "./model/dnaDevice";
 
 @Component({
   selector: 'app-device-orderable-list',
@@ -28,10 +28,10 @@ export class DeviceOrderableListComponent implements AfterViewInit {
   public dragObjectOptions: IDragObjectOptions;
 
   @Output()
-  public deviceListUpdated:EventEmitter<Array<Device>> = new EventEmitter();
+  public deviceListUpdated:EventEmitter<Array<DnaDevice>> = new EventEmitter();
 
   @Input()
-  public deviceList: Array<Device>;
+  public deviceList: Array<DnaDevice>;
 
   @HostListener("window:resize", ["$event"])
   onWindowResize(event) {
@@ -39,9 +39,8 @@ export class DeviceOrderableListComponent implements AfterViewInit {
   }
 
   private onMouseDownHandler = (event) => { this.onMouseDown(event) };
-  private onObjectMoveHandler = (event) => { this.onObjectMove(event) };
-  private onMouseUpHandler = (event) => { this.onDrop(event) };
-  private onDeleteObjectHandler= (dragObject) => { this.onDelete(dragObject) };
+  private onMouseMoveHandler = (event) => { this.onMouseMove(event) };
+  private onMouseUpHandler = (event) => { this.onMouseUp(event) };
   private _dragObjectProjection: DragObject;
   private _dragStartIndex:number;
 
@@ -53,7 +52,7 @@ export class DeviceOrderableListComponent implements AfterViewInit {
 
   ngAfterViewInit(): void {
     this.canvas = new fabric.Canvas('deviceHolder', <ICanvasOptions>{backgroundColor: '#cccccc', selection:false});
-    this.canvas.on('mouse:move',this.onObjectMoveHandler);
+    this.canvas.on('mouse:move',this.onMouseMoveHandler);
     this.canvas.on('mouse:up',this.onMouseUpHandler);
     this.canvas.on('mouse:down',this.onMouseDownHandler);
     this.initializeItems();
@@ -80,8 +79,6 @@ export class DeviceOrderableListComponent implements AfterViewInit {
         this.canvas.requestRenderAll();
       });
 
-      dragObject.deleted.subscribe(this.onDeleteObjectHandler);
-
       this.canvas.add(dragObject);
       dragObject.init();
 
@@ -93,10 +90,9 @@ export class DeviceOrderableListComponent implements AfterViewInit {
     this.canvas.requestRenderAll();
   }
 
-  private onDelete(targetObj){
-    targetObj.deleted.unsubscribe();
+  private onDelete(targetObj)
+  {
     this.canvas.remove(targetObj);
-
     this.deviceList = this.deviceList.filter(obj => obj !== targetObj.device);
     this.dragObjectList = this.dragObjectList.filter(obj => obj !== targetObj);
 
@@ -144,22 +140,17 @@ export class DeviceOrderableListComponent implements AfterViewInit {
   private onMouseDown(event: any) {
 
     var position = this.canvas.getPointer(event.e);
-    var target:DragObject;
-    for (const dragObject of this.dragObjectList) {
-      var rect = dragObject.getBoundingRect();
-      if(position.x >= rect.left && position.x <= rect.left + rect.width && position.y >= rect.top && position.y <= rect.top + rect.height){
-        target = dragObject;
-        this._mouseOffsetX = position.x - rect.left;
-        this._mouseOffsetY = position.y - rect.top;
-        break;
-      }
-    }
+    var target = this.getTargetFromPosition(position);
 
-    if(target.checkIfDeleteButtonIsPressed(position)){
-        return;
+    if(target.checkIfMouseIsOnDeleteButton(position)){
+      // can popup a warning for delete
+      this.onDelete(target);
+      return;
     }
 
     if(target != null){
+      this._mouseOffsetX = position.x - target.left;
+      this._mouseOffsetY = position.y - target.top;
       this._dragObjectProjection = fabric.util.object.clone(target);
       this._dragObjectProjection.device = target.device;
       target.opacity = 0.3;
@@ -172,7 +163,7 @@ export class DeviceOrderableListComponent implements AfterViewInit {
     }
   }
 
-  private onObjectMove(event: any) {
+  private onMouseMove(event: any) {
 
     var position = this.canvas.getPointer(event.e);
 
@@ -193,13 +184,20 @@ export class DeviceOrderableListComponent implements AfterViewInit {
         this.dragObjectList.forEach(value => value.calcCoords());
         console.log(this.deviceList);
       }
-
       this.canvas.requestRenderAll();
-    }
+    }else{
+      var position = this.canvas.getPointer(event.e);
+      var target = this.getTargetFromPosition(position);
 
+      if(target.checkIfMouseIsOnDeleteButton(position)){
+       this.canvas.setCursor('pointer');
+      }else{
+        this.canvas.setCursor('auto');
+      }
+    }
   }
 
-  private onDrop(event:any){
+  private onMouseUp(event:any){
 
     if(this._dragObjectProjection!=null){
       this.canvas.remove(this._dragObjectProjection);
@@ -214,7 +212,6 @@ export class DeviceOrderableListComponent implements AfterViewInit {
     arr.splice(toIndex, 0, element);
   };
 
-
   private columnRowToIndex(row:number, column:number):number {
     var index = 0;
     if(row > 0) {
@@ -227,4 +224,15 @@ export class DeviceOrderableListComponent implements AfterViewInit {
   }
 
 
+  private getTargetFromPosition(position: { x: number; y: number }) {
+    var target:DragObject;
+    for (const dragObject of this.dragObjectList) {
+      var rect = dragObject.getBoundingRect();
+      if(position.x >= rect.left && position.x <= rect.left + rect.width && position.y >= rect.top && position.y <= rect.top + rect.height){
+        target = dragObject;
+        break;
+      }
+    }
+    return target;
+  }
 }

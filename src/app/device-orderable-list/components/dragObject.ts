@@ -1,5 +1,5 @@
 import {fabric} from 'fabric'
-import {Device} from "../model/Device";
+import {DnaDevice} from "../model/dnaDevice";
 import {EventEmitter} from "@angular/core";
 import {IGroupOptions, IObjectOptions, IRectOptions, ITextOptions} from "fabric/fabric-impl";
 import {IDragObjectOptions} from "./IDragObjectOptions";
@@ -23,7 +23,6 @@ export class DragObject extends fabric.Group {
     evented: false,
     hasControls: false,
     excludeFromExport: true,
-
   };
 
   private _deviceOptions: IObjectOptions = <IObjectOptions>{
@@ -33,13 +32,14 @@ export class DragObject extends fabric.Group {
     originY: 'top',
   };
 
-  constructor(public device: Device, private dragObjectOptions: IDragObjectOptions) {
+  constructor(public device: DnaDevice, private dragObjectOptions: IDragObjectOptions) {
     super([], <IGroupOptions>{
       originX: 'left',
       originY: 'top',
       selectable: false,
       hasControls: false,
-      width: dragObjectOptions.dragObjectWidth,
+      padding: dragObjectOptions.dragObjectSpacing,
+      width: dragObjectOptions.dragObjectWidth ,
       height: dragObjectOptions.dragObjectHeight
     });
   }
@@ -49,8 +49,8 @@ export class DragObject extends fabric.Group {
     var rect: fabric.Rect = new fabric.Rect(<IRectOptions>{
       width: this.dragObjectOptions.dragObjectWidth,
       height: this.dragObjectOptions.dragObjectHeight,
+      fill: '#ffffff',
       evented: true,
-      fill: '#ffffff'
     });
     this.addWithUpdate(rect);
 
@@ -58,20 +58,18 @@ export class DragObject extends fabric.Group {
       originX: 'left',
       originY: 'top',
       evented: false,
-      width: this.dragObjectOptions.dragObjectWidth * 0.8,
-      height: this.dragObjectOptions.dragObjectHeight * 0.8
+      width: this.dragObjectOptions.dragObjectWidth * 0.6,
+      height: this.dragObjectOptions.dragObjectHeight * 0.6
     };
 
-    this._textOption.width = this._imageOptions.width;
-    this._textOption.top = this.dragObjectOptions.dragObjectHeight - 20;
-    fabric.loadSVGFromURL(this.device.iconUrl, results => {
+    fabric.loadSVGFromURL(this.device.svgIcon, results => {
       this._image = fabric.util.groupSVGElements(results);
       var minScale = Math.min(this._imageOptions.width / this._image.width, this._imageOptions.height / this._image.height);
       this._image.scaleX = minScale;
       this._image.scaleY = minScale;
       this._image.calcCoords();
-      this._image.left = this.left + this.dragObjectOptions.dragObjectWidth * 0.1;
-      this._image.top = this.top;
+      this._image.left = this.left + this.dragObjectOptions.dragObjectWidth * 0.2;
+      this._image.top = this.top + this.dragObjectOptions.dragObjectHeight * 0.2;
       this._image.setOptions(this._deviceOptions);
       this.addWithUpdate(this._image);
 
@@ -82,12 +80,11 @@ export class DragObject extends fabric.Group {
     });
 
 
-    fabric.Image.fromURL("assets/icons/trash.png", image => {
+    fabric.Image.fromURL("assets/img/trash.png", image => {
       this._deleteIcon = image;
-      var minScale = Math.min(20 / this._deleteIcon.width, 20 / this._deleteIcon.height);
+      var minScale = Math.min(15 / this._deleteIcon.width, 15 / this._deleteIcon.height);
       this._deleteIcon.scaleX = minScale;
       this._deleteIcon.scaleY = minScale;
-      this._deleteIcon.hoverCursor = "pointer";
       this._deleteIcon.setOptions(this._deviceOptions);
       this._deleteIcon.left = this.left + 2;
       this._deleteIcon.top = this.top + 2;
@@ -96,19 +93,19 @@ export class DragObject extends fabric.Group {
       this.needsRedraw.emit(true);
     });
 
-
-    this._label = new fabric.Textbox(this.device.name, this._textOption);
-    this._label.left = this.dragObjectOptions.dragObjectWidth * 0.1;
+    this._textOption.width = this._imageOptions.width;
+    this._textOption.top = this.dragObjectOptions.dragObjectHeight - 15;
+    this._label = new fabric.Textbox(this.device.deviceName.length > 14 ? this.device.deviceName.substring(0, 11) + '...' : this.device.deviceName, this._textOption);
+    this._label.left = this.dragObjectOptions.dragObjectWidth * 0.2;
     this.addWithUpdate(this._label);
   }
 
-  public checkIfDeleteButtonIsPressed(point:{x,y}){
+  public checkIfMouseIsOnDeleteButton(point:{x,y}){
 
-    let isDeleteIconPressed = point.x > this.left  && point.x < this.left + this._deleteIcon.getScaledWidth() && point.y > this.top && point.y < this.top + this._deleteIcon.getScaledHeight();
-    if(isDeleteIconPressed){
-      this.deleted.emit(this);
-    }
-    return isDeleteIconPressed;
-
+    let isInBoundary =  point.x > this.left  &&
+                        point.x < this.left + this._deleteIcon.getScaledWidth() &&
+                        point.y > this.top &&
+                        point.y < this.top + this._deleteIcon.getScaledHeight();
+    return isInBoundary;
   }
 }
